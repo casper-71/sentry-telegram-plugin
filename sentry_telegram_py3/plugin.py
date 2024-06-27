@@ -1,5 +1,6 @@
 # coding: utf-8
 import logging
+import re
 from collections import defaultdict
 
 from django import forms
@@ -103,12 +104,11 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
     def build_message(self, group, event):
         the_tags = defaultdict(lambda: '[NA]')
         if isinstance(event.tags, list):
+            # If event.tags is a list, convert it to a dictionary using key and value attributes
             the_tags.update({tag.key: tag.value for tag in event.tags})
-        elif isinstance(event.tags, dict):
-            the_tags.update(event.tags)
         else:
-            self.logger.warning('Unexpected type for event.tags: %s' % type(event.tags))
-            the_tags.update({})
+            # Assume event.tags is already a dictionary
+            the_tags.update(event.tags)
 
         names = {
             'title': event.title,
@@ -144,7 +144,8 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         receivers = self.get_option('receivers', project)
         if not receivers:
             return []
-        return list(filter(bool, receivers.strip().splitlines()))
+        # Split by new line or semicolon and filter out empty strings
+        return list(filter(bool, re.split(r'[;\n]', receivers)))
 
     def send_message(self, url, payload, chat_id, message_thread_id):
         payload['chat_id'] = chat_id
