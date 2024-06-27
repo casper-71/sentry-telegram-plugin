@@ -104,8 +104,12 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         the_tags = defaultdict(lambda: '[NA]')
         if isinstance(event.tags, list):
             the_tags.update({tag.key: tag.value for tag in event.tags})
+        elif isinstance(event.tags, dict):
+            the_tags.update(event.tags)
         else:
-            the_tags.update({k: v for k, v in event.tags.items()})
+            self.logger.warning('Unexpected type for event.tags: %s' % type(event.tags))
+            the_tags.update({})
+
         names = {
             'title': event.title,
             'tag': the_tags,
