@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 
 from django import forms
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from sentry.plugins.bases import notify
 from sentry.http import safe_urlopen
@@ -93,7 +93,7 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
                 'label': 'Message Template',
                 'type': 'textarea',
                 'help': 'Set in standard python\'s {}-format convention, available names are: '
-                    '{project_name}, {url}, {title}, {message}, {tag[%your_tag%]}. Undefined tags will be shown as [NA]',
+                        '{project_name}, {url}, {title}, {message}, {tag[%your_tag%]}. Undefined tags will be shown as [NA]',
                 'validators': [],
                 'required': True,
                 'default': '*[Sentry]* {project_name} {tag[level]}: *{title}*\n```{message}```\n{url}'
@@ -102,7 +102,7 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
 
     def build_message(self, group, event):
         the_tags = defaultdict(lambda: '[NA]')
-        the_tags.update({k:v for k, v in event.tags})
+        the_tags.update({k:v for k, v in event.tags.items()})
         names = {
             'title': event.title,
             'tag': the_tags,
@@ -114,7 +114,10 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
 
         template = self.get_message_template(group.project)
 
-        text = template.format(**names)
+        if template:
+            text = template.format(**names)
+        else:
+            text = 'Default message if template is not defined'
 
         return {
             'text': text,
@@ -125,7 +128,10 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         return '%s/bot%s/sendMessage' % (self.get_option('api_origin', project), self.get_option('api_token', project))
 
     def get_message_template(self, project):
-        return self.get_option('message_template', project)
+        template = self.get_option('message_template', project)
+        if template is None:
+            return ''  # Return empty string or a default message if template is None
+        return template
 
     def get_receivers(self, project):
         receivers = self.get_option('receivers', project)
@@ -139,7 +145,7 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         if message_thread_id:
             payload['message_thread_id'] = message_thread_id
             self.logger.debug('Sending message to message_thread_id: %s ' % message_thread_id)
-            
+
         response = safe_urlopen(
             method='POST',
             url=url,
