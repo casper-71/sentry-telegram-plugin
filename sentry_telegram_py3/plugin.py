@@ -106,7 +106,22 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
 
     def build_message(self, group, event):
         the_tags = defaultdict(lambda: '[NA]')
-        the_tags.update({k:v for k, v in event.tags})
+        self.logger.debug('Event tags type: %s', type(event.tags))
+        if isinstance(event.tags, list):
+            try:
+                # Convert list to dictionary using key and value attributes
+                the_tags.update({tag.key: tag.value for tag in event.tags})
+            except AttributeError as e:
+                self.logger.error('Error processing event.tags as list: %s', e)
+                # Fall back to converting list of tuples (assuming (key, value) pairs)
+                the_tags.update({k: v for k, v in event.tags})
+        elif isinstance(event.tags, dict):
+            # Assume event.tags is already a dictionary
+            the_tags.update(event.tags)
+        else:
+            self.logger.warning('Unexpected type for event.tags: %s', type(event.tags))
+            the_tags.update({})  # Default to empty dictionary
+
         names = {
             'title': event.title,
             'tag': the_tags,
@@ -118,7 +133,14 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
 
         template = self.get_message_template(group.project)
 
-        text = template.format(**names)
+        if template:
+            try:
+                text = template.format(**names)
+            except KeyError as e:
+                self.logger.error('Missing key in template names: %s', e)
+                text = 'Error formatting message'
+        else:
+            text = 'Default message if template is not defined'
 
         return {
             'text': text,
@@ -129,12 +151,16 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         return '%s/bot%s/sendMessage' % (self.get_option('api_origin', project), self.get_option('api_token', project))
 
     def get_message_template(self, project):
-        return self.get_option('message_template', project)
+        template = self.get_option('message_template', project)
+        if template is None:
+            return ''  # Return empty string or a default message if template is None
+        return template
 
     def get_receivers(self, project):
         receivers = self.get_option('receivers', project)
         if not receivers:
             return []
+        # Split by new line or semicolon and filter out empty strings
         return list(filter(bool, receivers.strip().splitlines()))
 
     def send_message(self, url, payload, chat_id, message_thread_id):
