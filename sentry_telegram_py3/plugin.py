@@ -109,12 +109,10 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
         self.logger.debug('Event tags type: %s', type(event.tags))
         if isinstance(event.tags, list):
             try:
-                # Convert list to dictionary using key and value attributes
-                the_tags.update({tag.key: tag.value for tag in event.tags})
-            except AttributeError as e:
-                self.logger.error('Error processing event.tags as list: %s', e)
-                # Fall back to converting list of tuples (assuming (key, value) pairs)
+                # If event.tags is a list of tuples, convert it to a dictionary
                 the_tags.update({k: v for k, v in event.tags})
+            except Exception as e:
+                self.logger.error('Error processing event.tags as list: %s', e)
         elif isinstance(event.tags, dict):
             # Assume event.tags is already a dictionary
             the_tags.update(event.tags)
@@ -189,4 +187,4 @@ class TelegramNotificationsPlugin(CorePluginMixin, notify.NotificationPlugin):
             receiver_info = receiver.split(";")
             chat_id = receiver_info[0]
             message_thread_id = receiver_info[1] if len(receiver_info) == 2 else None
-            safe_execute(self.send_message, url, payload, chat_id, message_thread_id, _with_transaction=False)
+            safe_execute(self.send_message, url, payload, chat_id, message_thread_id)
